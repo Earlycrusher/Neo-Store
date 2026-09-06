@@ -2,6 +2,8 @@ package com.machiav3lli.fdroid.ui.pages
 
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.MutatorMutex
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,6 +11,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,12 +46,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.machiav3lli.fdroid.LINK_KEEP_ANDROID_OPEN
 import com.machiav3lli.fdroid.NeoActivity
 import com.machiav3lli.fdroid.NeoApp
-import com.machiav3lli.fdroid.POPUP_LONG
 import com.machiav3lli.fdroid.POPUP_NONE
 import com.machiav3lli.fdroid.POPUP_SHORT
 import com.machiav3lli.fdroid.R
@@ -85,7 +89,10 @@ import com.machiav3lli.fdroid.viewmodels.MainVM
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
+@OptIn(
+    ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class
+)
 @Composable
 fun MainPage(
     navigator: (NavRoute) -> Unit,
@@ -106,7 +113,9 @@ fun MainPage(
     val dialogKey: MutableState<DialogKey?> = remember { mutableStateOf(null) }
 
     val showPopup = remember { mutableIntStateOf(POPUP_NONE) }
-    val syncTooltipState = rememberTooltipState()
+    val tooltipMutatorMutex = MutatorMutex()
+    val syncReportTooltipState = rememberTooltipState(mutatorMutex = tooltipMutatorMutex)
+    val syncWaitTooltipState = rememberTooltipState(mutatorMutex = tooltipMutatorMutex)
     val showBanner = remember(Preferences[Preferences.Key.IgnoreKeepAndroidOpenNotice]) {
         mutableStateOf(!Preferences[Preferences.Key.IgnoreKeepAndroidOpenNotice])
     }
@@ -152,27 +161,48 @@ fun MainPage(
                             tooltip = {
                                 PlainTooltip {
                                     Text(
-                                        when (showPopup.intValue) {
-                                            POPUP_LONG -> stringResource(
+                                        stringResource(id = R.string.wait_to_sync)
+                                    )
+                                }
+                            },
+                            state = syncWaitTooltipState,
+                        ) { }
+                        TooltipBox(
+                            positionProvider =
+                                TooltipDefaults.rememberTooltipPositionProvider(
+                                    TooltipAnchorPosition.Below
+                                ),
+                            tooltip = {
+                                PlainTooltip {
+                                    Column(
+                                        modifier = Modifier
+                                            .verticalScroll(rememberScrollState()),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                                    ) {
+                                        Text(
+                                            text = stringResource(
                                                 id = R.string.last_successful_sync,
                                                 context.getLocaleDateString(syncingState.latestSyncs.latest),
                                                 context.getLocaleDateString(syncingState.latestSyncs.latestAll),
                                             )
-
-                                            else       -> stringResource(id = R.string.wait_to_sync)
+                                        )
+                                        if (syncingState.syncErrors.isNotEmpty()) {
+                                            Text(
+                                                text = stringResource(R.string.sync_errors),
+                                                fontWeight = FontWeight.Bold,
+                                            )
+                                            syncingState.syncErrors.forEach { repo ->
+                                                Text(text = "${repo.name}: ${repo.lastError}")
+                                            }
                                         }
-                                    )
+                                    }
                                 }
                             },
-                            state = syncTooltipState,
+                            state = syncReportTooltipState,
                         ) {
                             SyncButton(
                                 modifier = Modifier.padding(top = 8.dp),
                                 isSyncing = syncingState.isSyncing,
-                                onLongClick = {
-                                    showPopup.intValue = POPUP_LONG
-                                    scope.launch { syncTooltipState.show() }
-                                },
                                 onClick = {
                                     if (System.currentTimeMillis() - Preferences[Preferences.Key.LastManualSyncTime] >= 10_000L) {
                                         Preferences[Preferences.Key.LastManualSyncTime] =
@@ -180,7 +210,7 @@ fun MainPage(
                                         scope.launch { BatchSyncWorker.enqueue(SyncRequest.MANUAL) }
                                     } else {
                                         showPopup.intValue = POPUP_SHORT
-                                        scope.launch { syncTooltipState.show() }
+                                        scope.launch { syncWaitTooltipState.show() }
                                     }
                                 }
                             )

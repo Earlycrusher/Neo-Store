@@ -39,12 +39,14 @@ open class MainVM(
 ) : ViewModel() {
     private val successfulSyncs = reposRepo.getLatestUpdates()
     private val isSyncing = reposRepo.getIsSyncing()
+    private val syncErrors = reposRepo.getSyncErrors()
 
     val syncingState = combine(
         successfulSyncs,
         isSyncing,
-    ) { latestSyncs, isSyncing ->
-        SyncingState(latestSyncs, isSyncing)
+        syncErrors,
+    ) { latestSyncs, isSyncing, syncErrors ->
+        SyncingState(latestSyncs, isSyncing, syncErrors)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Lazily,
@@ -164,6 +166,7 @@ open class MainVM(
 data class SyncingState(
     val latestSyncs: LatestSyncs = LatestSyncs(),
     val isSyncing: Boolean = false,
+    val syncErrors: List<Repository> = emptyList(),
 )
 
 data class DataState(
