@@ -27,6 +27,8 @@ class RepositoriesRepository(
 
     fun getLatestUpdates(): Flow<LatestSyncs> = reposDao.latestUpdatesFlow()
 
+    fun getSyncErrors(): Flow<List<Repository>> = reposDao.getSyncErrorsFlow()
+
     fun getIsSyncing(): Flow<Boolean> = NeoApp.wm.isSyncing
 
     fun productsCount(repoId: Long): Flow<Long> = productsDao.countForRepositoryFlow(repoId)

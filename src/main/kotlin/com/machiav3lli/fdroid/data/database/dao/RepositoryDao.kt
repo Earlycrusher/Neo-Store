@@ -79,6 +79,9 @@ interface RepositoryDao : BaseDao<Repository> {
     @Query("SELECT MAX(updated) AS latest, MIN(updated) AS latestAll FROM repository WHERE enabled != 0")
     fun latestUpdatesFlow(): Flow<LatestSyncs>
 
+    @Query("SELECT * FROM repository WHERE enabled != 0 AND lastError != '' ORDER BY id ASC")
+    fun getSyncErrorsFlow(): Flow<List<Repository>>
+
     @Query("SELECT EXISTS(SELECT 1 FROM repository WHERE address = :address LIMIT 1)")
     suspend fun isDuplicateAddress(address: String): Boolean
 

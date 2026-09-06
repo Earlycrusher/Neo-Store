@@ -59,6 +59,10 @@ data class Repository(
     val mirrorRotation: Boolean = false,
     @ColumnInfo(defaultValue = "0")
     val trusted: Boolean = false,
+    @ColumnInfo(defaultValue = "")
+    val lastError: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val lastErrorType: Int = 0,
 ) {
     val intentAddress: String
         get() = "${address.trimEnd('/')}?fingerprint=$fingerprint"
