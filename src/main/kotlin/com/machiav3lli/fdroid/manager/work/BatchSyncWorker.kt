@@ -143,6 +143,16 @@ class BatchSyncWorker(
                         result.success -> {
                             Log.d(TAG, "Successfully synced repository: ${repo.name} (${repo.id})")
                             if (result.changed) reposSucceeded.incrementAndFetch()
+                            if (repo.lastError.isNotEmpty() || repo.lastErrorType != RepositoryUpdater.ErrorType.NONE.ordinal) {
+                                reposRepo.load(repo.id)?.let { fresh ->
+                                    reposRepo.upsert(
+                                        fresh.copy(
+                                            lastError = "",
+                                            lastErrorType = RepositoryUpdater.ErrorType.NONE.ordinal,
+                                        )
+                                    )
+                                }
+                            }
                             setForeground(
                                 createForegroundInfo(
                                     totalRepos,
@@ -160,6 +170,12 @@ class BatchSyncWorker(
                                 repo.name,
                                 result.error ?: "",
                                 result.errorType,
+                            )
+                            reposRepo.upsert(
+                                repo.copy(
+                                    lastError = result.error ?: "",
+                                    lastErrorType = result.errorType.ordinal,
+                                )
                             )
                             setForeground(
                                 createForegroundInfo(
